@@ -1,0 +1,13 @@
+[
+  {"id":"peugeot-201","marque":"Peugeot","modele":"201 Berline","annees":"1929-37","cv":23,"poids":890,"vmax":85,"penteConfort":10},
+  {"id":"peugeot-202","marque":"Peugeot","modele":"202 Berline","annees":"1938-49","cv":30,"poids":950,"vmax":100,"penteConfort":12},
+  {"id":"peugeot-203","marque":"Peugeot","modele":"203 Berline","annees":"1948-60","cv":42,"poids":1010,"vmax":120,"penteConfort":14},
+  {"id":"peugeot-404","marque":"Peugeot","modele":"404 Berline","annees":"1960-75","cv":72,"poids":1080,"vmax":152,"penteConfort":18},
+  {"id":"citroen-traction","marque":"Citroën","modele":"Traction 11CV","annees":"1934-57","cv":56,"poids":1150,"vmax":115,"penteConfort":15},
+  {"id":"citroen-2cv-azam","marque":"Citroën","modele":"2CV AZAM","annees":"1963-67","cv":18,"poids":530,"vmax":105,"penteConfort":11},
+  {"id":"citroen-2cv6","marque":"Citroën","modele":"2CV 6","annees":"1970-90","cv":29,"poids":590,"vmax":115,"penteConfort":15},
+  {"id":"renault-4cv","marque":"Renault","modele":"4CV","annees":"1947-61","cv":21,"poids":560,"vmax":100,"penteConfort":12},
+  {"id":"renault-dauphine","marque":"Renault","modele":"Dauphine","annees":"1956-68","cv":27,"poids":690,"vmax":110,"penteConfort":13},
+  {"id":"simca-8","marque":"Simca","modele":"8","annees":"1938-51","cv":35,"poids":960,"vmax":110,"penteConfort":13},
+  {"id":"panhard-dynax","marque":"Panhard","modele":"Dyna X","annees":"1948-54","cv":28,"poids":650,"vmax":120,"penteConfort":14}
+]

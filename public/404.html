@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>VintagRoute</title>
+    <!--
+      VintagRoute — Application de navigation pour voitures anciennes
+      © 2026 Yves — Tous droits réservés
+      Licence : CC BY-NC-SA 4.0
+
+      Cette page 404 redirige vers index.html pour le fonctionnement
+      de la PWA en mode Single Page Application sur GitHub Pages.
+    -->
+    <script>
+      // Redirige les 404 GitHub Pages vers index.html (SPA)
+      var pathSegmentsToKeep = 0;
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body>
+  </body>
+</html>

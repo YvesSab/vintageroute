@@ -1,0 +1,84 @@
+/**
+ * VintageRoute — Application de navigation pour voitures anciennes
+ * © 2026 Yves — Tous droits réservés
+ * Licence : CC BY-NC-SA 4.0
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Palette principale — issue du logo */
+  --vr-navy: #1e2d3a;
+  --vr-green: #5b6b2d;
+  --vr-cream: #f2edd8;
+  --vr-red: #7a2e2e;
+
+  /* Palette secondaire */
+  --vr-gold: #c4a23d;
+  --vr-brown: #8b6e4e;
+  --vr-brown-dark: #5c3d2a;
+  --vr-sand: #e6dcc6;
+  --vr-orange: #c97b32;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 18px;
+  background: var(--vr-cream);
+  color: var(--vr-navy);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Boutons senior-friendly : min 48px tactile */
+button, a, input, select {
+  min-height: 48px;
+  font-size: 18px;
+}
+
+/* Layout split : panneau gauche + carte droite */
+.vr-layout {
+  display: grid;
+  height: 100vh;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+}
+
+.vr-header {
+  grid-column: 1 / -1;
+}
+
+.vr-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.vr-map {
+  position: relative;
+  min-height: 300px;
+}
+
+/* Desktop : 2 colonnes */
+@media (min-width: 768px) {
+  .vr-layout {
+    grid-template-columns: 400px 1fr;
+  }
+  .vr-map {
+    min-height: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .vr-layout {
+    grid-template-columns: 440px 1fr;
+  }
+}
