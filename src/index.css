@@ -44,7 +44,10 @@ button, a, input, select {
   font-size: 18px;
 }
 
-/* Layout split : panneau gauche + carte droite */
+/* =========================================
+   LAYOUT : panneau gauche + carte droite
+   ========================================= */
+
 .vr-layout {
   display: grid;
   height: 100vh;
@@ -60,6 +63,7 @@ button, a, input, select {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  transition: transform 0.3s ease, width 0.3s ease;
 }
 
 .vr-map {
@@ -80,5 +84,110 @@ button, a, input, select {
 @media (min-width: 1280px) {
   .vr-layout {
     grid-template-columns: 440px 1fr;
+  }
+}
+
+/* =========================================
+   PLEIN ÉCRAN (DEC-019, tâche 2.5)
+   ========================================= */
+
+.vr-fullscreen {
+  grid-template-columns: 1fr !important;
+}
+
+.vr-fullscreen .vr-sidebar-hidden {
+  display: none;
+}
+
+.vr-fullscreen .vr-map-fullscreen {
+  grid-column: 1 / -1;
+  grid-row: 2 / -1;
+  min-height: 0;
+}
+
+/* Mobile : sidebar toujours masquable */
+@media (max-width: 767px) {
+  .vr-fullscreen .vr-header {
+    display: none;
+  }
+  .vr-fullscreen .vr-map-fullscreen {
+    grid-row: 1 / -1;
+  }
+}
+
+/* =========================================
+   IMPRESSION A4 (tâche 2.4)
+   ========================================= */
+
+/* Résumé impression — masqué à l'écran */
+.print-summary {
+  display: none;
+}
+
+@media print {
+  /* Masquer les éléments inutiles */
+  .no-print,
+  .vr-sidebar,
+  .vr-fullscreen-btn {
+    display: none !important;
+  }
+
+  /* Afficher le résumé impression */
+  .print-summary {
+    display: block;
+    padding: 15mm;
+    font-size: 12pt;
+    color: #1e2d3a;
+    page-break-before: always;
+  }
+
+  .print-summary h2 {
+    font-size: 16pt;
+    margin-bottom: 8pt;
+    color: #5b6b2d;
+  }
+
+  .print-summary p {
+    margin: 4pt 0;
+  }
+
+  .print-footer {
+    margin-top: 20pt;
+    font-size: 8pt;
+    color: #999;
+    text-align: center;
+  }
+
+  /* En-tête compact */
+  .print-header {
+    padding: 5mm !important;
+  }
+
+  .print-header p {
+    display: none;
+  }
+
+  /* Carte : prendre toute la page */
+  .vr-layout {
+    display: block !important;
+    height: auto !important;
+  }
+
+  .vr-map {
+    width: 100%;
+    height: 150mm;
+    position: relative !important;
+    page-break-after: always;
+  }
+
+  .vr-map-container {
+    position: relative !important;
+    width: 100% !important;
+    height: 150mm !important;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
   }
 }

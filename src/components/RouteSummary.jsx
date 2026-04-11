@@ -2,16 +2,44 @@
  * VintageRoute — Application de navigation pour voitures anciennes
  * © 2026 Yves — Tous droits réservés
  * Licence : CC BY-NC-SA 4.0
- * https://github.com/vintageroute/vintageroute
+ * https://github.com/YvesSab/vintagroute
  */
 
 import React from 'react';
 import { formatDistance, formatDuration } from '../services/routing';
 
 /**
- * Résumé de l'itinéraire calculé (distance, durée, alertes surface)
+ * Affichage du scoring paysager en étoiles.
  */
-function RouteSummary({ distance, duration, filterStats, onClear }) {
+function ScenicBadge({ scoring }) {
+  if (!scoring || scoring.score === 0) return null;
+
+  const stars = '★'.repeat(scoring.score) + '☆'.repeat(5 - scoring.score);
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg
+                    bg-[var(--vr-cream)] border border-[var(--vr-gold)]">
+      <span className="text-sm" style={{ color: '#c4a23d' }}>{stars}</span>
+      <span className="text-sm font-medium text-[var(--vr-brown-dark)]">
+        {scoring.label}
+      </span>
+      {scoring.details?.densityPerKm > 0 && (
+        <span className="text-xs text-gray-400">
+          ({scoring.details.densityPerKm} élém./km)
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Résumé itinéraire + boutons export (Phase 2).
+ */
+function RouteSummary({
+  distance, duration, filterStats, scoring,
+  onClear, onExportGPX, onExportPDF, onPrint,
+  exportingPDF,
+}) {
   const hasWarnings = filterStats && (filterStats.warning > 0 || filterStats.forbidden > 0);
 
   return (
@@ -44,11 +72,13 @@ function RouteSummary({ distance, duration, filterStats, onClear }) {
         </button>
       </div>
 
+      {/* Scoring paysager (tâche 2.9) */}
+      <ScenicBadge scoring={scoring} />
+
       {/* Alertes filtrage surface */}
       {hasWarnings && (
         <div className="border-t border-gray-200 pt-3 flex flex-col gap-2">
           <p className="text-sm font-semibold text-gray-500">Surface des routes</p>
-
           {filterStats.forbidden > 0 && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg
                             bg-red-50 border border-[var(--vr-red)]">
@@ -59,7 +89,6 @@ function RouteSummary({ distance, duration, filterStats, onClear }) {
               </span>
             </div>
           )}
-
           {filterStats.warning > 0 && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg
                             bg-orange-50 border border-[var(--vr-orange)]">
@@ -86,6 +115,46 @@ function RouteSummary({ distance, duration, filterStats, onClear }) {
           </div>
         </div>
       )}
+
+      {/* Boutons export (tâches 2.3, 2.4, 2.14) */}
+      <div className="border-t border-gray-200 pt-3 flex gap-2 flex-wrap">
+        {onExportGPX && (
+          <button
+            type="button"
+            onClick={onExportGPX}
+            className="flex-1 py-2 text-sm font-semibold rounded-lg
+                       bg-[var(--vr-navy)] text-[var(--vr-cream)]
+                       active:opacity-80 min-w-0"
+          >
+            📥 GPX
+          </button>
+        )}
+        {onExportPDF && (
+          <button
+            type="button"
+            onClick={onExportPDF}
+            disabled={exportingPDF}
+            className={`flex-1 py-2 text-sm font-semibold rounded-lg min-w-0
+              ${exportingPDF
+                ? 'bg-gray-300 text-gray-500'
+                : 'bg-[var(--vr-red)] text-white active:opacity-80'
+              }`}
+          >
+            {exportingPDF ? '⏳ PDF…' : '📄 PDF'}
+          </button>
+        )}
+        {onPrint && (
+          <button
+            type="button"
+            onClick={onPrint}
+            className="flex-1 py-2 text-sm font-semibold rounded-lg
+                       bg-[var(--vr-brown)] text-white
+                       active:opacity-80 min-w-0"
+          >
+            🖨️ Imprimer
+          </button>
+        )}
+      </div>
     </div>
   );
 }
