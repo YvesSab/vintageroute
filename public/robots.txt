@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://vintageroute.netlify.app/sitemap.xml

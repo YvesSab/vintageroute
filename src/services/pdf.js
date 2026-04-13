@@ -5,6 +5,8 @@
  * https://github.com/YvesSab/vintagroute
  */
 
+import { CUISINE_FR } from '../config';
+
 let jsPDFModule = null;
 async function loadJsPDF() {
   if (!jsPDFModule) jsPDFModule = await import('jspdf');
@@ -17,6 +19,14 @@ function stripEmoji(str) {
 }
 
 function truncate(s, n) { return s && s.length > n ? s.substring(0, n - 1) + '...' : (s || ''); }
+
+function formatCuisine(raw) {
+  if (!raw) return '';
+  return raw.split(/[;,]/).map(c => {
+    const k = c.trim().toLowerCase();
+    return CUISINE_FR[k] || (k.charAt(0).toUpperCase() + k.slice(1));
+  }).join(', ');
+}
 
 const TYPE_LABEL = {
   viewpoint: 'Vue', restaurant: 'Resto', hotel: 'Hotel',
@@ -95,7 +105,9 @@ export async function exportPDF(mapContainer, mapInstance, params) {
   // Numéros POI sur la carte
   if (params.pois?.length > 0) {
     const maxPoisOnMap = Math.min(params.pois.length, 25);
-    const canvasW = canvas.width, canvasH = canvas.height;
+    // IMPORTANT : clientWidth/clientHeight = pixels CSS (comme map.project())
+    // canvas.width/height = pixels physiques (retina 2x) → décalage !
+    const canvasW = canvas.clientWidth || canvas.width, canvasH = canvas.clientHeight || canvas.height;
 
     for (let i = 0; i < maxPoisOnMap; i++) {
       const poi = params.pois[i];
@@ -177,7 +189,7 @@ export async function exportPDF(mapContainer, mapInstance, params) {
       y += 8;
     }
 
-    // Liste POI numérotée avec détails
+    // Liste POI numérotée avec détails — 3 colonnes
     if (hasPois) {
       pdf.setFontSize(11); pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(30, 45, 58);
@@ -190,54 +202,100 @@ export async function exportPDF(mapContainer, mapInstance, params) {
       pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(120, 120, 120);
       const labels = { viewpoint: 'points de vue', restaurant: 'restaurants', hotel: 'hotels', historic: 'monuments', picnic: 'aires pique-nique' };
       pdf.text(Object.entries(tc).map(([t, c]) => `${c} ${labels[t] || t}`).join(' - '), m, y);
-      y += 5;
+      y += 6;
 
-      const colW = (W - m * 2) / 2;
+      const COLS = 3;
+      const colW = (W - m * 2) / COLS;
       let col = 0, rowY = y;
       const startY = y;
+      const maxY = H - 10;
+      const TRUNC = 40; // chars max par ligne dans 3 colonnes
 
-      pdf.setFontSize(7.5);
+      pdf.setFontSize(7);
       const maxPois = Math.min(params.pois.length, 50);
 
       for (let i = 0; i < maxPois; i++) {
         const poi = params.pois[i];
         const x = m + col * colW;
 
-        if (rowY > H - 12 && col === 0) { col = 1; rowY = startY; }
-        if (rowY > H - 12 && col === 1) {
-          if (i < maxPois - 1) {
-            pdf.setFontSize(7); pdf.setTextColor(140, 140, 140);
-            pdf.text(`... et ${params.pois.length - i} autres`, x, rowY);
+        // Estimer la hauteur de ce POI (3mm titre + 2.8mm par ligne détail + 1.5mm espace)
+        const LH = 3.3; // interligne mm
+        let lines = 1;
+        if (poi.subtype && poi.name !== poi.subtype) lines++;
+        if (poi.cuisine) lines++;
+        if (poi.address) lines++;
+        if (poi.openingHours) lines++;
+        if (poi.phone || poi.website) lines++;
+        if (poi.description || poi.dateBuilt) lines++;
+        const poiHeight = 3.5 + lines * LH + 2.5;
+
+        // Passage de colonne si débordement
+        if (rowY + poiHeight > maxY) {
+          col++;
+          rowY = startY;
+          if (col >= COLS) {
+            // Nouvelle page si 3 colonnes pleines
+            pdf.addPage('a4', 'landscape');
+            col = 0; rowY = m + 5;
+            pdf.setFontSize(9); pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(30, 45, 58);
+            pdf.text('Points d\'interet (suite)', m, m);
+            pdf.setFontSize(7);
           }
-          break;
         }
+        const cx = m + col * colW;
 
         // Numéro + type + nom
         const num = String(i + 1).padStart(2, ' ');
         const prefix = TYPE_LABEL[poi.type] || '';
         pdf.setTextColor(122, 46, 46); pdf.setFont('helvetica', 'bold');
-        pdf.text(`${num}.`, x, rowY);
+        pdf.text(`${num}.`, cx, rowY);
         pdf.setTextColor(91, 107, 45);
-        pdf.text(`[${prefix}]`, x + 6, rowY);
+        pdf.text(`[${prefix}]`, cx + 5, rowY);
         pdf.setTextColor(30, 45, 58); pdf.setFont('helvetica', 'bold');
-        pdf.text(truncate(poi.name, 38), x + 17, rowY);
+        pdf.text(truncate(poi.name, 28), cx + 15, rowY);
 
-        // Ligne de détails
-        const details = [];
-        if (poi.subtype && poi.name !== poi.subtype) details.push(poi.subtype);
-        if (poi.cuisine) details.push(poi.cuisine);
-        if (poi.address) details.push(poi.address);
-        if (poi.openingHours) details.push('Horaires: ' + poi.openingHours);
-        if (poi.phone) details.push('Tel: ' + poi.phone);
-        if (poi.website) details.push(poi.website.replace(/^https?:\/\//, '').substring(0, 30));
-
-        if (details.length > 0) {
-          pdf.setFont('helvetica', 'normal'); pdf.setTextColor(140, 140, 140);
-          pdf.text(truncate(details.join(' | '), 60), x + 6, rowY + 3);
-          rowY += 3.5;
+        if (poi.stars) {
+          const starsStr = '★'.repeat(Math.min(5, parseInt(poi.stars, 10) || 0));
+          pdf.setFont('helvetica', 'normal'); pdf.setTextColor(196, 162, 61);
+          pdf.text(starsStr, cx + 15 + pdf.getTextWidth(truncate(poi.name, 28)) + 1, rowY);
         }
 
-        rowY += 4.5;
+        rowY += LH;
+        pdf.setFont('helvetica', 'normal'); pdf.setTextColor(140, 140, 140);
+
+        if (poi.subtype && poi.name !== poi.subtype) {
+          pdf.text(truncate(poi.subtype, TRUNC), cx + 5, rowY); rowY += LH;
+        }
+        if (poi.cuisine) {
+          pdf.setTextColor(91, 107, 45);
+          pdf.text(truncate(formatCuisine(poi.cuisine), TRUNC), cx + 5, rowY);
+          pdf.setTextColor(140, 140, 140); rowY += LH;
+        }
+        if (poi.address) {
+          pdf.text(truncate(poi.address, TRUNC), cx + 5, rowY); rowY += LH;
+        }
+        if (poi.openingHours) {
+          pdf.text(truncate('Horaires: ' + poi.openingHours, TRUNC), cx + 5, rowY); rowY += LH;
+        }
+        const contactParts = [];
+        if (poi.phone) contactParts.push('Tel: ' + poi.phone);
+        if (poi.website) contactParts.push(poi.website.replace(/^https?:\/\//, '').substring(0, 25));
+        if (contactParts.length > 0) {
+          pdf.text(truncate(contactParts.join(' | '), TRUNC + 5), cx + 5, rowY); rowY += LH;
+        }
+        if (poi.description) {
+          pdf.setTextColor(100, 100, 100); pdf.setFont('helvetica', 'italic');
+          const desc = poi.dateBuilt ? `(${poi.dateBuilt}) ${poi.description}` : poi.description;
+          pdf.text(truncate(desc, TRUNC), cx + 5, rowY);
+          pdf.setFont('helvetica', 'normal'); pdf.setTextColor(140, 140, 140); rowY += LH;
+        } else if (poi.dateBuilt) {
+          pdf.setTextColor(100, 100, 100); pdf.setFont('helvetica', 'italic');
+          pdf.text(`Construit en ${poi.dateBuilt}`, cx + 5, rowY);
+          pdf.setFont('helvetica', 'normal'); pdf.setTextColor(140, 140, 140); rowY += LH;
+        }
+
+        rowY += 2.5; // espacement entre POI
       }
     }
 

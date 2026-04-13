@@ -5,7 +5,7 @@
  * https://github.com/YvesSab/vintagroute
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { formatDistance, formatDuration } from '../services/routing';
 
 /**
@@ -15,6 +15,9 @@ function ScenicBadge({ scoring }) {
   if (!scoring || scoring.score === 0) return null;
 
   const stars = '★'.repeat(scoring.score) + '☆'.repeat(5 - scoring.score);
+  const details = [];
+  if (scoring.details?.densityPerKm > 0) details.push(`${scoring.details.densityPerKm} élém./km`);
+  if (scoring.details?.sinuosity) details.push(scoring.details.sinuosity);
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-lg
@@ -23,9 +26,9 @@ function ScenicBadge({ scoring }) {
       <span className="text-sm font-medium text-[var(--vr-brown-dark)]">
         {scoring.label}
       </span>
-      {scoring.details?.densityPerKm > 0 && (
+      {details.length > 0 && (
         <span className="text-xs text-gray-400">
-          ({scoring.details.densityPerKm} élém./km)
+          ({details.join(' · ')})
         </span>
       )}
     </div>
@@ -37,10 +40,11 @@ function ScenicBadge({ scoring }) {
  */
 function RouteSummary({
   distance, duration, filterStats, scoring,
-  onClear, onExportGPX, onExportPDF, onPrint,
+  onClear, onExportGPX, onExportPDF, onPrint, onShare,
   exportingPDF,
 }) {
   const hasWarnings = filterStats && (filterStats.warning > 0 || filterStats.forbidden > 0);
+  const [shareCopied, setShareCopied] = useState(false);
 
   return (
     <div className="bg-white rounded-xl shadow p-4 flex flex-col gap-3">
@@ -116,7 +120,7 @@ function RouteSummary({
         </div>
       )}
 
-      {/* Boutons export (tâches 2.3, 2.4, 2.14) */}
+      {/* Boutons export + partage (tâches 2.3, 2.4, 2.14, DEC-064) */}
       <div className="border-t border-gray-200 pt-3 flex gap-2 flex-wrap">
         {onExportGPX && (
           <button
@@ -152,6 +156,23 @@ function RouteSummary({
                        active:opacity-80 min-w-0"
           >
             🖨️ Imprimer
+          </button>
+        )}
+        {onShare && (
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await onShare();
+              if (ok) {
+                setShareCopied(true);
+                setTimeout(() => setShareCopied(false), 2500);
+              }
+            }}
+            className="flex-1 py-2 text-sm font-semibold rounded-lg
+                       bg-[var(--vr-green)] text-white
+                       active:opacity-80 min-w-0"
+          >
+            {shareCopied ? '✅ Copié !' : '🔗 Partager'}
           </button>
         )}
       </div>

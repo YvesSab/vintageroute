@@ -2,11 +2,10 @@
  * VintageRoute — Application de navigation pour voitures anciennes
  * © 2026 Yves — Tous droits réservés
  * Licence : CC BY-NC-SA 4.0
- * https://github.com/vintageroute/vintageroute
+ * https://github.com/YvesSab/vintagroute
  */
 
-const COMPLETION_URL = 'https://data.geopf.fr/geocodage/completion/';
-const GEOCODE_URL = 'https://data.geopf.fr/geocodage/search';
+import { IGN_COMPLETION_URL, IGN_GEOCODE_URL } from '../config';
 
 // Délai anti-rebond en ms
 const DEBOUNCE_MS = 300;
@@ -33,7 +32,7 @@ export async function autocomplete(text) {
       terr: 'METROPOLE',
     });
 
-    const response = await fetch(`${COMPLETION_URL}?${params}`, {
+    const response = await fetch(`${IGN_COMPLETION_URL}?${params}`, {
       signal: abortController.signal,
     });
 
@@ -69,7 +68,7 @@ export async function geocode(address) {
       limit: '1',
     });
 
-    const response = await fetch(`${GEOCODE_URL}?${params}`);
+    const response = await fetch(`${IGN_GEOCODE_URL}?${params}`);
     if (!response.ok) return null;
 
     const data = await response.json();

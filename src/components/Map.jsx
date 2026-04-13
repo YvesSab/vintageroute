@@ -7,6 +7,7 @@
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { CUISINE_FR } from '../config';
 
 const DEFAULT_CENTER = [1.87, 46.17], DEFAULT_ZOOM = 10;
 const ROUTE_SRC = 'vr-route', ROUTE_OUT = 'vr-route-out', ROUTE_LN = 'vr-route-ln';
@@ -17,12 +18,13 @@ const SC = { ok: '#5b6b2d', warning: '#c97b32', forbidden: '#7a2e2e' };
 const EFC = { type: 'FeatureCollection', features: [] };
 
 function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+function fmtCuisine(r) { return r?r.split(/[;,]/).map(c=>{const k=c.trim().toLowerCase();return CUISINE_FR[k]||(k.charAt(0).toUpperCase()+k.slice(1));}).join(', '):''; }
 function popup(p) {
   let h = `<div style="font-family:-apple-system,sans-serif;max-width:240px;font-size:14px;"><strong style="font-size:15px;">${p.emoji} ${esc(p.name)}</strong>`;
   if (p.subtype) h += `<br><span style="color:#8b6e4e;font-size:12px;">${esc(p.subtype)}</span>`;
   else if (p.label) h += `<br><span style="color:#8b6e4e;font-size:12px;">${esc(p.label)}</span>`;
   if (p.address) h += `<br><span style="color:#666;font-size:12px;">📍 ${esc(p.address)}</span>`;
-  if (p.cuisine) h += `<br><span style="color:#666;font-size:12px;">🍴 ${esc(p.cuisine)}</span>`;
+  if (p.cuisine) h += `<br><span style="color:#666;font-size:12px;">🍴 ${esc(fmtCuisine(p.cuisine))}</span>`;
   if (p.stars) h += `<br>${'⭐'.repeat(Math.min(5,parseInt(p.stars,10)||0))}`;
   if (p.openingHours) h += `<br><span style="color:#666;font-size:11px;">🕐 ${esc(p.openingHours)}</span>`;
   if (p.phone) h += `<br>📞 <a href="tel:${esc(p.phone)}" style="color:#5b6b2d;">${esc(p.phone)}</a>`;
@@ -32,9 +34,9 @@ function popup(p) {
   return h + '</div>';
 }
 
-const Map = forwardRef(function Map({ routeGeoJSON, filteredGeoJSON, bisRouteGeoJSON, pois, sp98Stations, isochroneGeoJSON, onToggleFullscreen, isFullscreen, onPoiMarkerClick }, ref) {
+const Map = forwardRef(function Map({ routeGeoJSON, filteredGeoJSON, bisRouteGeoJSON, pois, sp98Stations, isochroneGeoJSON, routeAlerts, onToggleFullscreen, isFullscreen, onPoiMarkerClick }, ref) {
   const ctr = useRef(null), mRef = useRef(null), [ready, setReady] = useState(false);
-  const mk = useRef([]), pmk = useRef([]), smk = useRef([]);
+  const mk = useRef([]), pmk = useRef([]), smk = useRef([]), amk = useRef([]);
 
   useImperativeHandle(ref, () => ({
     fitBounds(b) { if (!mRef.current||!b) return; const bb = Array.isArray(b)?[[b[0],b[1]],[b[2],b[3]]]:[[b.west,b.south],[b.east,b.north]]; mRef.current.fitBounds(bb,{padding:60,maxZoom:15}); },
@@ -108,6 +110,23 @@ const Map = forwardRef(function Map({ routeGeoJSON, filteredGeoJSON, bisRouteGeo
     smk.current = sp98Stations.map(s => { const e=document.createElement('div'); e.textContent='⛽'; e.style.fontSize='20px'; e.style.cursor='pointer';
       return new maplibregl.Marker({element:e}).setLngLat([s.lon,s.lat]).setPopup(new maplibregl.Popup({offset:20,maxWidth:'240px'}).setHTML(popup(s))).addTo(m); });
   }, [sp98Stations, ready]);
+
+  // Bloc E : Alertes virages serrés et descentes fortes
+  useEffect(() => { const m=mRef.current; if(!m||!ready) return; amk.current.forEach(x=>x.remove()); amk.current=[];
+    if (!routeAlerts?.length) return;
+    amk.current = routeAlerts.map(a => {
+      const el = document.createElement('div');
+      el.textContent = a.type === 'sharp' ? '⚠️' : '🔻';
+      el.style.fontSize = '16px';
+      el.style.cursor = 'pointer';
+      el.style.filter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))';
+      const color = a.type === 'sharp' ? '#c97b32' : '#7a2e2e';
+      return new maplibregl.Marker({element:el}).setLngLat([a.lon,a.lat])
+        .setPopup(new maplibregl.Popup({offset:15,maxWidth:'200px'}).setHTML(
+          `<div style="font-family:-apple-system,sans-serif;font-size:13px;"><strong style="color:${color};">${a.type==='sharp'?'⚠️ Virage serré':'🔻 Forte descente'}</strong><br><span style="color:#666;font-size:12px;">${esc(a.label)}</span></div>`
+        )).addTo(m);
+    });
+  }, [routeAlerts, ready]);
 
   return (
     <div ref={ctr} className="vr-map-container" style={{position:'absolute',top:0,left:0,right:0,bottom:0,width:'100%',height:'100%'}}>

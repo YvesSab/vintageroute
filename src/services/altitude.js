@@ -2,39 +2,11 @@
  * VintageRoute — Application de navigation pour voitures anciennes
  * © 2026 Yves — Tous droits réservés
  * Licence : CC BY-NC-SA 4.0
- * https://github.com/vintageroute/vintageroute
+ * https://github.com/YvesSab/vintagroute
  */
 
-const ALTI_URL = 'https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json';
-const MAX_SAMPLES = 200; // Nombre max de points à échantillonner
-
-/**
- * Distance approx en mètres entre 2 points GPS (formule Haversine simplifiée).
- */
-function distMeters(lon1, lat1, lon2, lat2) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/**
- * Échantillonne les coordonnées d'un itinéraire pour garder ~MAX_SAMPLES points.
- * @param {Array<[number,number]>} coords - [[lng, lat], ...]
- * @returns {Array<[number,number]>}
- */
-function sampleCoords(coords) {
-  if (coords.length <= MAX_SAMPLES) return coords;
-  const step = (coords.length - 1) / (MAX_SAMPLES - 1);
-  const sampled = [];
-  for (let i = 0; i < MAX_SAMPLES; i++) {
-    sampled.push(coords[Math.round(i * step)]);
-  }
-  return sampled;
-}
+import { IGN_ALTI_URL, ALTI_MAX_SAMPLES } from '../config';
+import { distMeters, sampleCoords } from './utils';
 
 /**
  * Récupère le profil altimétrique le long d'un itinéraire GeoJSON.
@@ -53,7 +25,7 @@ export async function fetchElevationProfile(routeGeoJSON) {
   const coords = routeGeoJSON?.geometry?.coordinates;
   if (!coords || coords.length < 2) return null;
 
-  const sampled = sampleCoords(coords);
+  const sampled = sampleCoords(coords, ALTI_MAX_SAMPLES);
 
   // Construire les paramètres lon/lat séparés par |
   const lons = sampled.map(c => c[0].toFixed(6)).join('|');
@@ -69,7 +41,7 @@ export async function fetchElevationProfile(routeGeoJSON) {
     zonly: 'false',
   });
 
-  const response = await fetch(`${ALTI_URL}?${params}`);
+  const response = await fetch(`${IGN_ALTI_URL}?${params}`);
   if (!response.ok) {
     throw new Error(`API IGN altitude ${response.status}`);
   }

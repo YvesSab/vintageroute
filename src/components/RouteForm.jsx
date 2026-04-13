@@ -138,12 +138,30 @@ function AddressInput({ label, placeholder, onSelect, value: externalValue }) {
 /**
  * Formulaire départ / étapes / arrivée + mode boucle (Phase 2).
  */
-function RouteForm({ onRouteRequest, onLoopRequest, loading }) {
+function RouteForm({ onRouteRequest, onLoopRequest, loading, initialRoute }) {
   const [departure, setDeparture] = useState(null);
   const [arrival, setArrival] = useState(null);
   const [waypoints, setWaypoints] = useState([]); // [{label, lng, lat} | null]
   const [loopMode, setLoopMode] = useState(false);
   const [loopDuration, setLoopDuration] = useState(120); // minutes
+  const [depLabel, setDepLabel] = useState('');
+  const [arrLabel, setArrLabel] = useState('');
+  const [wpLabels, setWpLabels] = useState([]);
+
+  // DEC-064 — Pré-remplir depuis URL partagée
+  const initialApplied = useRef(false);
+  useEffect(() => {
+    if (!initialRoute || initialApplied.current) return;
+    initialApplied.current = true;
+    setDeparture(initialRoute.departure);
+    setArrival(initialRoute.arrival);
+    setDepLabel(initialRoute.departure.label || '');
+    setArrLabel(initialRoute.arrival.label || '');
+    if (initialRoute.intermediates?.length > 0) {
+      setWaypoints(initialRoute.intermediates);
+      setWpLabels(initialRoute.intermediates.map(w => w.label || ''));
+    }
+  }, [initialRoute]);
 
   const canSubmit = departure && (loopMode || arrival) && !loading;
 
@@ -224,6 +242,7 @@ function RouteForm({ onRouteRequest, onLoopRequest, loading }) {
         label="🟢 Départ"
         placeholder="Ville ou adresse de départ…"
         onSelect={setDeparture}
+        value={depLabel}
       />
 
       {/* Mode boucle : durée */}
@@ -262,6 +281,7 @@ function RouteForm({ onRouteRequest, onLoopRequest, loading }) {
                   label={`📌 Étape ${index + 1}`}
                   placeholder={`Étape intermédiaire ${index + 1}…`}
                   onSelect={(val) => updateWaypoint(index, val)}
+                  value={wpLabels[index] || ''}
                 />
               </div>
               <button
@@ -296,6 +316,7 @@ function RouteForm({ onRouteRequest, onLoopRequest, loading }) {
             label="🔴 Arrivée"
             placeholder="Ville ou adresse d'arrivée…"
             onSelect={setArrival}
+            value={arrLabel}
           />
         </>
       )}
