@@ -27,7 +27,22 @@ export const OVERPASS_SERVERS = [
 ];
 
 // ─── Timeouts (ms) ───
-export const TIMEOUT_BROUTER = 15000;
+// DEC-071 — Timeouts BRouter adaptatifs selon la distance vol d'oiseau.
+// L'ancien timeout fixe 15s déclenchait sur les trajets >300 km
+// (Paris-Barcelonnette = 21s côté serveur), forçant le fallback IGN
+// qui ré-emprunte les autoroutes (DEC-039).
+export const TIMEOUT_BROUTER_SHORT = 15000;   // < 100 km
+export const TIMEOUT_BROUTER_MEDIUM = 30000;  // 100-300 km
+export const TIMEOUT_BROUTER_LONG = 60000;    // 300-600 km
+export const TIMEOUT_BROUTER_XLONG = 90000;   // > 600 km
+
+// Compatibilité avec les imports existants (utilisé pour boucles courtes)
+export const TIMEOUT_BROUTER = TIMEOUT_BROUTER_MEDIUM;
+
+// Retry BRouter sur erreurs 5xx (offline, transitoires)
+export const BROUTER_RETRY_DELAY_MS = 2500;
+export const BROUTER_RETRY_COUNT = 1;  // 1 retry = 2 tentatives au total
+
 export const TIMEOUT_IGN = 15000;
 export const TIMEOUT_OVERPASS = 20000;
 export const TIMEOUT_WIKIDATA = 10000;

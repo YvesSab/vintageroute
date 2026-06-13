@@ -3,24 +3,38 @@
  * © 2026 Yves — Tous droits réservés
  * Licence : CC BY-NC-SA 4.0
  * https://github.com/YvesSab/vintagroute
+ *
+ * DEC-069 — SP98 : filtrage géographique par bbox de la route
+ * (remplace l'ancien DEPT_BBOX figé à 7 départements autour de la Creuse).
+ *
+ * Stratégie :
+ *   1. Calcul d'une bbox englobante de la route + buffer 0.05° (~5 km)
+ *   2. Requête API ODS v2.1 avec in_bbox(geom, ...) dans le where (max 100 résultats)
+ *   3. Filtrage côté client par distance Haversine au tracé (max 5 km)
+ *   4. Tri par position le long de la route (du départ vers l'arrivée)
  */
+
+import { distMeters, distToRoute, projectionAlongRoute } from './utils';
 
 const SP98_URL = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records';
 
-/**
- * Départements Limousin + voisins avec bbox approximatifs.
- */
-const DEPT_BBOX = [
-  { code: '23', minLat: 45.66, maxLat: 46.50, minLng: 1.37, maxLng: 2.61 },
-  { code: '87', minLat: 45.43, maxLat: 46.23, minLng: 0.63, maxLng: 1.71 },
-  { code: '19', minLat: 45.05, maxLat: 45.77, minLng: 1.22, maxLng: 2.52 },
-  { code: '36', minLat: 46.31, maxLat: 47.28, minLng: 0.86, maxLng: 2.20 },
-  { code: '03', minLat: 46.04, maxLat: 46.80, minLng: 2.28, maxLng: 3.98 },
-  { code: '63', minLat: 45.28, maxLat: 46.26, minLng: 2.38, maxLng: 3.98 },
-  { code: '18', minLat: 46.42, maxLat: 47.63, minLng: 1.77, maxLng: 3.07 },
-];
+// Distance maximale d'une station à la route (en mètres)
+const MAX_DIST_FROM_ROUTE_M = 5000;
 
-function getDepartments(coords) {
+// Buffer ajouté à la bbox de la route (en degrés, ~5 km)
+const BBOX_BUFFER_DEG = 0.05;
+
+// IMPORTANT : L'API ODS v2.1 plafonne le paramètre `limit` à 100.
+// Au-delà, elle renvoie HTTP 400 InvalidRESTParameterError.
+// On trie par sp98_maj desc pour récupérer les stations les plus
+// récemment mises à jour (= les plus actives).
+const API_MAX_LIMIT = 100;
+
+/**
+ * Calcule la bbox englobante d'un tracé GeoJSON, avec un buffer.
+ * @returns {object} { minLat, maxLat, minLng, maxLng }
+ */
+function computeRouteBbox(coords, bufferDeg = BBOX_BUFFER_DEG) {
   let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
   for (const [lng, lat] of coords) {
     if (lat < minLat) minLat = lat;
@@ -28,29 +42,46 @@ function getDepartments(coords) {
     if (lng < minLng) minLng = lng;
     if (lng > maxLng) maxLng = lng;
   }
-  const matching = DEPT_BBOX.filter((d) =>
-    minLat <= d.maxLat && maxLat >= d.minLat && minLng <= d.maxLng && maxLng >= d.minLng
-  );
-  return matching.length > 0 ? matching.map((d) => d.code) : ['23'];
+  return {
+    minLat: minLat - bufferDeg,
+    maxLat: maxLat + bufferDeg,
+    minLng: minLng - bufferDeg,
+    maxLng: maxLng + bufferDeg,
+  };
 }
 
 /**
- * Récupère les stations SP98 le long d'un itinéraire (tâche 2.10).
- * Filtre par départements traversés (fiable, pas de filtre géo complexe).
+ * Récupère les stations SP98 le long d'un itinéraire.
+ *
+ * @param {object} routeGeoJSON - Feature GeoJSON LineString
+ * @param {object} options
+ * @param {number} options.maxResults - nombre max de stations à retourner (défaut 30)
+ * @param {number} options.maxFetch - nombre max à demander à l'API (max 100, plafond ODS v2.1)
+ * @returns {Promise<Array>} stations triées le long du parcours
  */
 export async function fetchSP98Stations(routeGeoJSON, options = {}) {
   const coords = routeGeoJSON?.geometry?.coordinates;
   if (!coords || coords.length < 2) return [];
 
-  const { maxResults = 30 } = options;
-  const deptCodes = getDepartments(coords);
-  const deptFilter = deptCodes.map((c) => `code_departement="${c}"`).join(' or ');
+  const { maxResults = 30, maxFetch = API_MAX_LIMIT } = options;
+  // Garde-fou : ne jamais dépasser la limite API ODS v2.1
+  const safeFetch = Math.min(maxFetch, API_MAX_LIMIT);
+
+  // 1. Bbox de la route avec buffer
+  const bbox = computeRouteBbox(coords);
+
+  // 2. Requête ODS v2.1 avec in_bbox dans le where
+  // Syntaxe validée : in_bbox(geom, minLat, minLng, maxLat, maxLng)
+  const whereClause =
+    `sp98_prix is not null AND ` +
+    `in_bbox(geom, ${bbox.minLat.toFixed(5)}, ${bbox.minLng.toFixed(5)}, ` +
+    `${bbox.maxLat.toFixed(5)}, ${bbox.maxLng.toFixed(5)})`;
 
   try {
     const params = new URLSearchParams({
       select: 'id,adresse,ville,cp,geom,sp98_prix,sp98_maj',
-      where: `sp98_prix is not null and (${deptFilter})`,
-      limit: String(maxResults),
+      where: whereClause,
+      limit: String(safeFetch),
       order_by: 'sp98_maj desc',
     });
 
@@ -58,17 +89,19 @@ export async function fetchSP98Stations(routeGeoJSON, options = {}) {
     if (!response.ok) throw new Error(`API carburants ${response.status}`);
 
     const data = await response.json();
-    if (!data.results) return [];
+    const results = data?.results || [];
+    if (results.length === 0) return [];
 
-    return data.results
-      .filter((r) => r.sp98_prix && r.geom)
+    // 3. Mapper en objets station + filtrer celles sans coordonnées valides
+    const stations = results
       .map((r) => {
-        const lat = r.geom.lat;
-        const lon = r.geom.lon;
-        if (!lat || !lon) return null;
+        const lat = r.geom?.lat;
+        const lon = r.geom?.lon;
+        if (typeof lat !== 'number' || typeof lon !== 'number') return null;
 
         // sp98_prix : en millièmes si > 100, sinon déjà en €
         const raw = typeof r.sp98_prix === 'number' ? r.sp98_prix : parseFloat(r.sp98_prix);
+        if (!Number.isFinite(raw)) return null;
         const price = raw > 100 ? raw / 1000 : raw;
 
         return {
@@ -82,6 +115,28 @@ export async function fetchSP98Stations(routeGeoJSON, options = {}) {
         };
       })
       .filter(Boolean);
+
+    // 4. Filtrage par distance à la route
+    const onRoute = stations
+      .map((s) => ({ ...s, distToRoute: distToRoute(s.lon, s.lat, coords) }))
+      .filter((s) => s.distToRoute <= MAX_DIST_FROM_ROUTE_M);
+
+    if (onRoute.length === 0) {
+      console.log(`VintageRoute SP98: ${stations.length} stations dans la bbox, 0 à moins de ${MAX_DIST_FROM_ROUTE_M / 1000} km du tracé`);
+      return [];
+    }
+
+    // 5. Tri par position le long de la route (départ → arrivée)
+    onRoute.forEach((s) => {
+      s._proj = projectionAlongRoute(s.lon, s.lat, coords);
+    });
+    onRoute.sort((a, b) => a._proj - b._proj);
+
+    // Nettoyer les champs internes avant retour
+    const final = onRoute.slice(0, maxResults).map(({ _proj, ...rest }) => rest);
+    console.log(`VintageRoute SP98: ${stations.length} dans bbox → ${onRoute.length} sur trajet → ${final.length} retenues`);
+    return final;
+
   } catch (err) {
     console.warn('VintageRoute SP98 error:', err.message);
     return [];

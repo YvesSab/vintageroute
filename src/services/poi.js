@@ -10,6 +10,12 @@ import { fetchWithTimeout, distMeters, routeBbox, distToRoute, projectionAlongRo
 
 // ═══════════ OVERPASS FETCH AVEC FALLBACK ═══════════
 
+// DEC-072 — abortController local pour POI : annule proprement les fetchs
+// en cours quand un nouveau calcul d'itinéraire est lancé. Évite les
+// "signal is aborted without reason → fallback" en cascade dans la console
+// quand l'utilisateur reclique rapidement sur "Calculer l'itinéraire".
+let poiAbortController = null;
+
 async function fetchOverpass(query) {
   return fetchOverpassWithServers(query, OVERPASS_SERVERS);
 }
@@ -17,18 +23,26 @@ async function fetchOverpass(query) {
 /**
  * Envoie une requête Overpass en essayant les serveurs dans l'ordre donné.
  * Permet le round-robin : chaque segment peut commencer par un serveur différent.
+ * Si poiAbortController est défini, son signal est propagé.
  */
 async function fetchOverpassWithServers(query, servers, timeout = TIMEOUT_OVERPASS) {
   let lastError = null;
   for (const serverUrl of servers) {
+    // Si l'utilisateur a relancé un calcul, abandonner immédiatement
+    if (poiAbortController?.signal.aborted) {
+      throw new Error('POI fetch annulé (nouveau calcul en cours)');
+    }
     try {
       const shortName = serverUrl.split('//')[1].split('/')[0];
       console.log('VintageRoute Overpass: essai', shortName);
-      const response = await fetchWithTimeout(serverUrl, {
+      const fetchOpts = {
         method: 'POST',
         body: `data=${encodeURIComponent(query)}`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      }, timeout);
+      };
+      // Propager le signal d'abort si présent
+      if (poiAbortController) fetchOpts.signal = poiAbortController.signal;
+      const response = await fetchWithTimeout(serverUrl, fetchOpts, timeout);
       if (!response.ok) { lastError = new Error(`Overpass ${response.status} (${shortName})`); console.warn('VintageRoute Overpass:', lastError.message, '→ fallback'); continue; }
       const data = await response.json();
       console.log('VintageRoute Overpass: succès via', shortName);
@@ -233,6 +247,10 @@ function buildBboxQuery(bbox) {
 export async function fetchPOIs(routeGeoJSON) {
   const coords = routeGeoJSON?.geometry?.coordinates;
   if (!coords || coords.length < 2) return [];
+
+  // DEC-072 — Annuler tout fetch POI en cours et créer un nouveau controller
+  if (poiAbortController) poiAbortController.abort();
+  poiAbortController = new AbortController();
 
   const routeLengthM = estimateRouteLength(coords);
   const routeLengthKm = routeLengthM / 1000;

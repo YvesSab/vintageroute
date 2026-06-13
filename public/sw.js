@@ -9,7 +9,7 @@
  * - Assets statiques : StaleWhileRevalidate
  */
 
-const CACHE_VERSION = 'vr-v0.6.0';
+const CACHE_VERSION = 'vr-v0.9.0';
 const CACHE_SHELL = `${CACHE_VERSION}-shell`;
 const CACHE_TILES = `${CACHE_VERSION}-tiles`;
 const CACHE_API = `${CACHE_VERSION}-api`;

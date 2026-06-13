@@ -7,18 +7,56 @@
  * DEC-041 — Architecture routing double-moteur :
  *   1. BRouter (brouter.de) — PRINCIPAL, avoid_motorways garanti dans le profil
  *   2. IGN bdtopo-valhalla — FALLBACK si BRouter indisponible
+ *
+ * DEC-071 — Timeouts BRouter adaptatifs selon distance + retry sur 5xx.
+ * Le résultat retourné inclut maintenant `engine: 'brouter' | 'ign'` pour
+ * que l'UI puisse afficher un bandeau "itinéraire de secours" si le fallback
+ * IGN a été utilisé (qui ne respecte pas la contrainte autoroute, DEC-039).
  */
 
 import {
   BROUTER_URL, IGN_ROUTING_URL, ISOCHRONE_URL,
-  TIMEOUT_BROUTER, TIMEOUT_IGN,
+  TIMEOUT_BROUTER_SHORT, TIMEOUT_BROUTER_MEDIUM, TIMEOUT_BROUTER_LONG, TIMEOUT_BROUTER_XLONG,
+  BROUTER_RETRY_DELAY_MS, BROUTER_RETRY_COUNT,
+  TIMEOUT_IGN,
 } from '../config';
-import { fetchWithTimeout, coordsFitBounds } from './utils';
+import { fetchWithTimeout, coordsFitBounds, distMeters } from './utils';
 
 let abortController = null;
 
 /**
+ * Choisit un timeout BRouter selon la distance vol d'oiseau en km.
+ */
+function pickBrouterTimeout(distKm) {
+  if (distKm < 100) return TIMEOUT_BROUTER_SHORT;
+  if (distKm < 300) return TIMEOUT_BROUTER_MEDIUM;
+  if (distKm < 600) return TIMEOUT_BROUTER_LONG;
+  return TIMEOUT_BROUTER_XLONG;
+}
+
+/**
+ * Distance vol d'oiseau totale via les waypoints (en km).
+ */
+function crowFlightKm(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += distMeters(points[i - 1].lng, points[i - 1].lat, points[i].lng, points[i].lat);
+  }
+  return total / 1000;
+}
+
+/**
+ * Pause asynchrone.
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Calcule un itinéraire via BRouter (principal) avec fallback IGN.
+ * Retourne { geojson, distance, duration, bbox, engine, warning? }
+ *   - engine: 'brouter' (cas normal) ou 'ign' (fallback de secours)
+ *   - warning: message à afficher si fallback IGN utilisé
  */
 export async function calculateRoute(start, end, intermediates = [], alternativeIdx = 0) {
   if (!start || !end) return null;
@@ -26,18 +64,50 @@ export async function calculateRoute(start, end, intermediates = [], alternative
   if (abortController) abortController.abort();
   abortController = new AbortController();
 
-  try {
-    const result = await calculateRouteBRouter(start, end, intermediates, alternativeIdx);
-    if (result) return result;
-  } catch (err) {
-    console.warn('VintageRoute BRouter error:', err.message, '→ fallback IGN');
+  // Tentative principale + retry sur erreurs transitoires
+  let lastBrouterError = null;
+  for (let attempt = 0; attempt <= BROUTER_RETRY_COUNT; attempt++) {
+    try {
+      const result = await calculateRouteBRouter(start, end, intermediates, alternativeIdx);
+      if (result) return { ...result, engine: 'brouter' };
+    } catch (err) {
+      lastBrouterError = err;
+      // Erreurs définitives : ne pas retry
+      const msg = err.message || '';
+      const isTransient = /\b(503|502|504|offline|timeout|aborted)\b/i.test(msg);
+      const isLastAttempt = attempt >= BROUTER_RETRY_COUNT;
+
+      if (!isTransient || isLastAttempt) {
+        console.warn('VintageRoute BRouter error:', msg, '→ fallback IGN');
+        break;
+      }
+
+      console.warn(
+        `VintageRoute BRouter erreur transitoire (tentative ${attempt + 1}/${BROUTER_RETRY_COUNT + 1}):`,
+        msg, `— retry dans ${BROUTER_RETRY_DELAY_MS}ms`
+      );
+      // Recréer un controller car le précédent peut avoir été abort
+      if (abortController.signal.aborted) {
+        abortController = new AbortController();
+      }
+      await sleep(BROUTER_RETRY_DELAY_MS);
+    }
   }
 
+  // Fallback IGN avec warning visible côté UI
   try {
-    return await calculateRouteIGN(start, end, intermediates);
+    const result = await calculateRouteIGN(start, end, intermediates);
+    return {
+      ...result,
+      engine: 'ign',
+      warning:
+        "Itinéraire calculé via le serveur de secours (IGN). " +
+        "Ce moteur peut emprunter de grands axes routiers. " +
+        "Réessayez dans une minute pour utiliser le moteur principal.",
+    };
   } catch (err) {
     console.error('VintageRoute routing error (tous moteurs):', err.message);
-    throw err;
+    throw lastBrouterError || err;
   }
 }
 
@@ -50,9 +120,12 @@ async function calculateRouteBRouter(start, end, intermediates = [], alternative
 
   const url = `${BROUTER_URL}?lonlats=${encodeURIComponent(lonlats)}&profile=car-eco&alternativeidx=${alternativeIdx}&format=geojson&profile:avoid_motorways=1&profile:avoid_toll=1`;
 
-  console.log('VintageRoute BRouter:', { alternativeIdx, points: points.length });
+  const distKm = crowFlightKm(points);
+  const timeout = pickBrouterTimeout(distKm);
 
-  const response = await fetchWithTimeout(url, { signal: abortController.signal }, TIMEOUT_BROUTER);
+  console.log('VintageRoute BRouter:', { alternativeIdx, points: points.length, distKm: Math.round(distKm), timeoutMs: timeout });
+
+  const response = await fetchWithTimeout(url, { signal: abortController.signal }, timeout);
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
@@ -107,6 +180,11 @@ async function calculateRouteIGN(start, end, intermediates = []) {
 
   console.log('VintageRoute IGN fallback:', { intermediates: validSteps.length });
 
+  // Recréer un controller si le précédent a été abort par BRouter
+  if (!abortController || abortController.signal.aborted) {
+    abortController = new AbortController();
+  }
+
   const response = await fetchWithTimeout(
     `${IGN_ROUTING_URL}?${params}`,
     { signal: abortController.signal },
@@ -131,13 +209,18 @@ async function calculateRouteIGN(start, end, intermediates = []) {
 
 /**
  * Calcule des itinéraires alternatifs via BRouter (alternativeidx 0,1,2).
+ * Pas de retry ici (3 tentatives × 2 = 6 appels max), pas de fallback IGN
+ * (les alternatives n'ont de sens qu'avec BRouter qui les supporte nativement).
  */
 export async function calculateAlternativeRoutes(start, end, intermediates = []) {
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
+
   const results = [];
   for (let idx = 0; idx < 3; idx++) {
     try {
       const result = await calculateRouteBRouter(start, end, intermediates, idx);
-      if (result) results.push({ ...result, index: idx });
+      if (result) results.push({ ...result, index: idx, engine: 'brouter' });
     } catch (err) {
       if (idx === 0) console.warn('VintageRoute alternatives: échec BRouter');
       break;
@@ -146,7 +229,10 @@ export async function calculateAlternativeRoutes(start, end, intermediates = [])
   if (results.length === 0) {
     try {
       const r = await calculateRouteIGN(start, end, intermediates);
-      if (r) results.push({ ...r, index: 0 });
+      if (r) results.push({
+        ...r, index: 0, engine: 'ign',
+        warning: "Itinéraire calculé via le serveur de secours (IGN). Peut emprunter de grands axes.",
+      });
     } catch (err) { /* silencieux */ }
   }
   return results;

@@ -139,30 +139,46 @@ const DEPT_BOUNDS = {
 };
 
 /**
- * Détermine quels départements sont traversés par une bbox.
+ * Détermine quels départements sont traversés par une route.
+ *
+ * DEC-070 — L'ancien algorithme prenait la bbox englobante de la route
+ * et chargait tous les départements dans cette bbox, ce qui surcharge
+ * massivement sur les longs trajets diagonaux (ex: Paris→Barcelonnette
+ * = 41 départements au lieu de 12, crash mémoire navigateur).
+ *
+ * Nouvel algorithme : test point-par-point. On échantillonne ~150 points
+ * le long de la route et on regarde dans quel département chaque point tombe.
+ * Résultat équivalent en temps (≤200 × 96 = 19 200 comparaisons), mais
+ * ne charge QUE les départements réellement traversés (+ quelques limitrophes
+ * dus aux bbox rectangulaires des départements, ce qui reste acceptable).
  */
 function findDepartments(routeCoords) {
   if (!routeCoords || routeCoords.length === 0) return ['23'];
 
-  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
-  // Échantillonner les coordonnées (pas besoin de toutes les parcourir)
-  const step = Math.max(1, Math.floor(routeCoords.length / 50));
+  const targetSamples = Math.min(200, Math.max(20, Math.floor(routeCoords.length / 10)));
+  const step = Math.max(1, Math.floor(routeCoords.length / targetSamples));
+  const depts = new Set();
+
+  // Test de chaque point échantillonné contre les bbox des départements
+  const entries = Object.entries(DEPT_BOUNDS);
   for (let i = 0; i < routeCoords.length; i += step) {
     const [lng, lat] = routeCoords[i];
-    if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
-    if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
-  }
-
-  const depts = [];
-  for (const [dept, bounds] of Object.entries(DEPT_BOUNDS)) {
-    // Intersection de bboxes
-    if (maxLat >= bounds.minLat && minLat <= bounds.maxLat &&
-        maxLng >= bounds.minLng && minLng <= bounds.maxLng) {
-      depts.push(dept);
+    for (const [dept, b] of entries) {
+      if (lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) {
+        depts.add(dept);
+      }
     }
   }
 
-  return depts.length > 0 ? depts : ['23'];
+  // Toujours inclure le dernier point (échantillonnage peut le manquer)
+  const [lastLng, lastLat] = routeCoords[routeCoords.length - 1];
+  for (const [dept, b] of entries) {
+    if (lastLat >= b.minLat && lastLat <= b.maxLat && lastLng >= b.minLng && lastLng <= b.maxLng) {
+      depts.add(dept);
+    }
+  }
+
+  return depts.size > 0 ? Array.from(depts).sort() : ['23'];
 }
 
 /**

@@ -14,6 +14,7 @@ import ElevationChart from './components/ElevationChart';
 import GPSPanel from './components/GPSPanel';
 import POIPanel from './components/POIPanel';
 import WeatherPanel from './components/WeatherPanel';
+import LoadingToast from './components/LoadingToast';
 const LandingPage = lazy(() => import('./components/LandingPage'));
 import { calculateRoute, calculateIsochrone, calculateAlternativeRoutes } from './services/routing';
 import { analyzeRoute, segmentsToGeoJSON } from './services/filtering';
@@ -41,7 +42,9 @@ function App() {
   const [elevationData, setElevationData] = useState(null);
   const [pois, setPois] = useState([]);
   const [poisLoading, setPoisLoading] = useState(false);
+  const [poisDoneAt, setPoisDoneAt] = useState(0);  // DEC-073 : timestamp fin de chargement (toast "✓")
   const [sp98Stations, setSp98Stations] = useState([]);
+  const [routingWarning, setRoutingWarning] = useState(null);  // DEC-071 : message si fallback IGN utilisé
   const [weather, setWeather] = useState(null);
   const [scoring, setScoring] = useState(null);
   const [routeAlerts, setRouteAlerts] = useState([]); // Bloc E : [{lon, lat, type, label}]
@@ -144,10 +147,11 @@ function App() {
 
   const clearAll = useCallback(() => {
     setRouteGeoJSON(null); setFilteredGeoJSON(null); setRouteInfo(null);
-    setFilterStats(null); setElevationData(null); setPois([]); setPoisLoading(false);
+    setFilterStats(null); setElevationData(null); setPois([]); setPoisLoading(false); setPoisDoneAt(0);
     setSp98Stations([]); setWeather(null); setScoring(null); setRouteAlerts([]); setIsochroneGeoJSON(null);
     setBisRouteGeoJSON(null); setBisRouteInfo(null); setBisAlternatives(null); setHighlightedPoiId(null); setError(null);
     setLoopVariants(null); setLoopCalculating(false); setLoopSeed(0); setSelectedLoopIndex(-1);
+    setRoutingWarning(null);  // DEC-071 — Effacer warning fallback IGN
     lastRouteRef.current = null; lastIntermediatesRef.current = [];
     // DEC-064 — Nettoyer le hash URL
     if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
@@ -190,7 +194,10 @@ function App() {
         .catch((e) => console.warn('Enrichissement:', e.message));
       // DEC-068 : Scoring utilise le nombre de POI déjà chargés (plus de 2e requête Overpass → plus de 429)
       setScoring(calculateScenicScore(geojson, r.length));
-    }).catch((e) => console.error('POI:', e.message)).finally(() => setPoisLoading(false));
+    }).catch((e) => console.error('POI:', e.message)).finally(() => {
+      setPoisLoading(false);
+      setPoisDoneAt(Date.now());
+    });
     fetchSP98Stations(geojson).then((r) => { console.log('VintageRoute SP98:', r.length, 'stations'); setSp98Stations(r); })
       .catch((e) => console.error('SP98:', e.message));
     fetchRouteWeather(geojson).then(setWeather).catch((e) => console.warn('Météo:', e.message));
@@ -203,6 +210,13 @@ function App() {
     }
   }, [routeGeoJSON, routeInfo, pois, elevationData, saveOfflineRoute]);
 
+  // DEC-073 — Faire disparaître le toast "✓" 1.3s après la fin du chargement POI
+  useEffect(() => {
+    if (poisDoneAt === 0 || poisLoading) return;
+    const t = setTimeout(() => setPoisDoneAt(0), 1300);
+    return () => clearTimeout(t);
+  }, [poisDoneAt, poisLoading]);
+
   const handleRouteRequest = useCallback(async ({ departure, arrival, intermediates }) => {
     setLoading(true); clearAll();
     try {
@@ -210,6 +224,15 @@ function App() {
       if (!result) return;
       setRouteGeoJSON(result.geojson);
       setRouteInfo({ distance: result.distance, duration: vehicle?.vmax ? result.duration * BROUTER_VINTAGE_FACTOR : result.duration });
+      // DEC-071 — Si fallback IGN utilisé, afficher un bandeau pour avertir
+      // que la route peut emprunter de grands axes (l'IGN ne respecte pas
+      // strictement la contrainte autoroute sur les longues distances, DEC-039).
+      if (result.engine === 'ign' && result.warning) {
+        console.warn('VintageRoute routing fallback IGN actif:', result.warning);
+        setRoutingWarning(result.warning);
+      } else {
+        setRoutingWarning(null);
+      }
       lastRouteRef.current = { departure, arrival, result };
       lastIntermediatesRef.current = intermediates || [];
       processRoute(result);
@@ -218,7 +241,7 @@ function App() {
       console.error('Erreur itinéraire:', err);
       setError("Impossible de calculer l'itinéraire.");
     } finally { setLoading(false); }
-  }, [clearAll, processRoute]);
+  }, [clearAll, processRoute, vehicle]);
 
   const getSpeedFactor = useCallback(() => {
     if (!vehicle || !vehicle.vmax) return 1;
@@ -680,12 +703,45 @@ function App() {
         <div className="mt-auto p-3 text-center text-sm text-gray-400">© 2026 Yves — VintageRoute</div>
       </aside>
 
-      <div className={`vr-map ${isFullscreen ? 'vr-map-fullscreen' : ''}`}>
+      <div className={`vr-map ${isFullscreen ? 'vr-map-fullscreen' : ''}`} style={{ position: 'relative' }}>
         <Map ref={mapRef} routeGeoJSON={routeGeoJSON} filteredGeoJSON={filteredGeoJSON}
           bisRouteGeoJSON={bisRouteGeoJSON} pois={pois} sp98Stations={sp98Stations}
           isochroneGeoJSON={isochroneGeoJSON} routeAlerts={routeAlerts}
           onToggleFullscreen={handleToggleFullscreen}
           isFullscreen={isFullscreen} onPoiMarkerClick={handlePoiMarkerClick} />
+
+        {/* DEC-071 — Bandeau warning si fallback IGN utilisé (route via grands axes) */}
+        {routingWarning && (
+          <div
+            role="alert"
+            style={{
+              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 16px', maxWidth: '92%',
+              background: '#fdf6e3', border: '2px solid #c97b32', borderRadius: 6,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              fontFamily: "Georgia, 'Playfair Display', serif", fontSize: 13, color: '#5c3d2a',
+              zIndex: 30,
+            }}
+          >
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span>{routingWarning}</span>
+            <button
+              type="button"
+              onClick={() => setRoutingWarning(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#8b6e4e', padding: '0 4px' }}
+              aria-label="Fermer l'avertissement"
+            >×</button>
+          </div>
+        )}
+
+        {/* DEC-073 — Toast de progression POI : sablier pendant chargement, ✓ pendant 1.2s à la fin */}
+        <LoadingToast
+          visible={poisLoading || (poisDoneAt > 0 && Date.now() - poisDoneAt < 1200)}
+          done={!poisLoading && poisDoneAt > 0}
+          title={poisLoading ? "Recherche des points d'intérêt" : `${pois.length} ${pois.length > 1 ? 'lieux trouvés' : 'lieu trouvé'} sur le parcours`}
+          subtitle={poisLoading && pois.length > 0 ? `${pois.length} ${pois.length > 1 ? 'déjà trouvés' : 'déjà trouvé'}…` : null}
+        />
       </div>
 
       {routeInfo && (

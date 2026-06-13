@@ -1,6 +1,6 @@
 {
   "name": "vintageroute",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "Application de navigation GPS pour voitures anciennes",
   "homepage": ".",
   "private": true,
