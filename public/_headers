@@ -1,0 +1,40 @@
+# VintageRoute — Configuration des en-têtes HTTP (Netlify)
+# © 2026 Yves — Tous droits réservés
+# Emplacement : frontend/public/_headers
+# (CRA le copie automatiquement dans build/ ; Netlify l'applique au déploiement)
+
+# ───────────────────────────────────────────────────────────────
+# Tous les chemins — en-têtes de sécurité
+# ───────────────────────────────────────────────────────────────
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=(), usb=()
+  # CSP en mode OBSERVATION (Report-Only) : ne bloque RIEN, journalise seulement
+  # les violations dans la console du navigateur. Procédure :
+  #   1. Déploie tel quel, ouvre la carte, calcule un itinéraire.
+  #   2. Regarde la console : chaque ressource bloquée apparaît en "[Report Only]".
+  #   3. Ajoute les hôtes manquants ci-dessous (img-src / connect-src).
+  #   4. Quand la carte marche sans aucune violation, renomme l'en-tête
+  #      "Content-Security-Policy-Report-Only" en "Content-Security-Policy".
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.wikimedia.org https://*.wikipedia.org; font-src 'self' data:; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https://data.geopf.fr https://brouter.de https://overpass-api.de https://overpass.private.coffee https://overpass.kumi.systems https://www.wikidata.org https://*.wikipedia.org https://*.wikimedia.org https://api.open-meteo.com https://data.economie.gouv.fr https://photon.komoot.io https://*.openfreemap.org https://tiles.openfreemap.org https://tiles.stadiamaps.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+# ───────────────────────────────────────────────────────────────
+# Assets hashés (main.<hash>.js / .css, media) — cache 1 an immuable
+# Le hash dans le nom change à chaque build : zéro risque de servir du périmé.
+# ───────────────────────────────────────────────────────────────
+/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# ───────────────────────────────────────────────────────────────
+# Fichiers à TOUJOURS revalider (pas de hash dans le nom)
+# ───────────────────────────────────────────────────────────────
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+/version.json
+  Cache-Control: public, max-age=0, must-revalidate
+/manifest.json
+  Cache-Control: public, max-age=0, must-revalidate

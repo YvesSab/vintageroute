@@ -1,0 +1,10 @@
+# VintageRoute — Redirections Netlify
+# © 2026 Yves — Tous droits réservés
+# Emplacement : frontend/public/_redirects
+#
+# Fallback SPA : toute URL sans fichier correspondant renvoie index.html (code 200).
+# Les fichiers réels (/version.json, /sw.js, /manifest.json, /static/*, /icons/*)
+# sont servis AVANT cette règle — aucun conflit. Évite les 404 au rafraîchissement
+# d'une page partagée ou d'un lien profond.
+
+/*    /index.html   200
