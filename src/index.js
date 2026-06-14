@@ -1,14 +1,15 @@
 /**
- * VintagRoute — Application de navigation pour voitures anciennes
+ * VintageRoute — Application de navigation pour voitures anciennes
  * © 2026 Yves — Tous droits réservés
  * Licence : CC BY-NC-SA 4.0
- * https://github.com/vintagroute/vintagroute
+ * https://github.com/YvesSab/vintagroute
  */
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import VersionBadge from './components/VersionBadge';
 
 // Enregistrement du Service Worker pour le mode hors ligne
 if ('serviceWorker' in navigator) {
@@ -21,5 +22,6 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <App />
+    <VersionBadge />
   </React.StrictMode>
 );

@@ -1,23 +1,41 @@
 {
-  "name": "VintageRoute",
+  "id": "/",
+  "name": "VintageRoute — Navigation pour voitures anciennes",
   "short_name": "VintageRoute",
-  "description": "Navigation GPS pour voitures anciennes",
+  "description": "Navigation GPS gratuite pour voitures anciennes : itinéraires sans autoroute, routes paysagères, profils véhicule, stations SP98.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1e2d3a",
   "theme_color": "#5b6b2d",
   "lang": "fr",
+  "dir": "ltr",
+  "categories": ["navigation", "travel", "maps"],
   "icons": [
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

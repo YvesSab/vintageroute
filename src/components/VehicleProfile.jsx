@@ -9,7 +9,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import vehiculesDB from '../data/vehicules.json';
 
 const STORAGE_KEY = 'vintageroute-vehicle';
-const CRR = 0.015; // Coefficient résistance au roulement (pneu ancien bitume)
 
 /**
  * Calcule les seuils de pente pour un véhicule donné.
@@ -32,6 +31,11 @@ function calculateSlopes(cv, poidsVide, charge) {
   const max = Math.min(20, alerte + 2);
 
   return { confort, alerte, max };
+}
+
+/** Charge maximale estimée (kg) selon le poids à vide du véhicule. */
+function computeChargeMax(poids) {
+  return Math.max(200, Math.min(600, Math.round(poids * 0.35)));
 }
 
 /**
@@ -88,15 +92,19 @@ function VehicleProfile({ onProfileChange }) {
   // Mettre à jour les pentes quand la charge change
   useEffect(() => {
     if (!profile) return;
-    const slopes = calculateSlopes(profile.cv, profile.poids, charge);
-    const updated = { ...profile, charge, slopes };
+    const c = Math.min(charge, computeChargeMax(profile.poids));
+    const slopes = calculateSlopes(profile.cv, profile.poids, c);
+    const updated = { ...profile, charge: c, slopes };
+    if (c !== charge) setCharge(c);
     setProfile(updated);
     saveProfile(updated);
     if (onProfileChange) onProfileChange(updated);
   }, [charge]); // charge change triggers recalculation
 
   const handleSelectVehicle = useCallback((vehicule) => {
-    const slopes = calculateSlopes(vehicule.cv, vehicule.poids, charge);
+    const c = Math.min(charge, computeChargeMax(vehicule.poids));
+    const slopes = calculateSlopes(vehicule.cv, vehicule.poids, c);
+    setCharge(c);
     const newProfile = {
       id: vehicule.id,
       marque: vehicule.marque,
@@ -105,7 +113,7 @@ function VehicleProfile({ onProfileChange }) {
       cv: vehicule.cv,
       poids: vehicule.poids,
       vmax: vehicule.vmax,
-      charge,
+      charge: c,
       carburant: 'SP98',
       slopes,
       manual: false,
@@ -122,7 +130,9 @@ function VehicleProfile({ onProfileChange }) {
     const vmax = parseInt(manualVmax, 10);
     if (!manualMarque || !manualModele || !cv || !poids) return;
 
-    const slopes = calculateSlopes(cv, poids, charge);
+    const c = Math.min(charge, computeChargeMax(poids));
+    const slopes = calculateSlopes(cv, poids, c);
+    setCharge(c);
     const newProfile = {
       id: 'manual',
       marque: manualMarque,
@@ -131,7 +141,7 @@ function VehicleProfile({ onProfileChange }) {
       cv,
       poids,
       vmax: vmax || 80,
-      charge,
+      charge: c,
       carburant: 'SP98',
       slopes,
       manual: true,
@@ -321,7 +331,7 @@ function VehicleProfile({ onProfileChange }) {
           {(() => {
             // Charge max = estimation basée sur le poids à vide du véhicule
             // PTAC typique ≈ poids × 1.30 à 1.40, donc chargeMax ≈ poids × 0.30 à 0.40
-            const chargeMax = Math.max(200, Math.min(600, Math.round(profile.poids * 0.35)));
+            const chargeMax = computeChargeMax(profile.poids);
             const chargeStep = 10;
             const chargeVal = Math.min(charge, chargeMax);
             return (

@@ -28,7 +28,7 @@ function popup(p) {
   if (p.stars) h += `<br>${'⭐'.repeat(Math.min(5,parseInt(p.stars,10)||0))}`;
   if (p.openingHours) h += `<br><span style="color:#666;font-size:11px;">🕐 ${esc(p.openingHours)}</span>`;
   if (p.phone) h += `<br>📞 <a href="tel:${esc(p.phone)}" style="color:#5b6b2d;">${esc(p.phone)}</a>`;
-  if (p.website) h += `<br>🌐 <a href="${esc(p.website)}" target="_blank" rel="noopener" style="color:#5b6b2d;">Site web</a>`;
+  if (p.website) { const w = /^https?:\/\//i.test(p.website) ? p.website : 'https://' + p.website.replace(/^\/+/, ''); h += `<br>🌐 <a href="${esc(w)}" target="_blank" rel="noopener noreferrer" style="color:#5b6b2d;">Site web</a>`; }
   if (p.description) h += `<br><span style="color:#555;font-size:12px;font-style:italic;">${esc(p.description.substring(0,120))}${p.description.length>120?'…':''}</span>`;
   if (p.type==='sp98'&&p.price) { h += `<br><b style="color:#5b6b2d;">${p.price.toFixed(3)} €/L</b>`; if (p.updated) h += ` <span style="color:#999;font-size:11px;">(${p.updated})</span>`; }
   return h + '</div>';

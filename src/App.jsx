@@ -67,6 +67,8 @@ function App() {
   const lastRouteRef = useRef(null);
   const lastIntermediatesRef = useRef([]);
   const mapRef = useRef(null);
+  // Compteur de génération : ignore les résultats async d'un trajet remplacé par un nouveau calcul.
+  const routeGenRef = useRef(0);
 
   // DEC-064 — Partage via URL : état initial depuis le hash
   const [initialRoute, setInitialRoute] = useState(null);
@@ -160,6 +162,7 @@ function App() {
   const processRoute = useCallback((result) => {
     const geojson = result.geojson;
     if (!geojson?.geometry?.coordinates?.length) return; // 2b.3 guard
+    const gen = ++routeGenRef.current; // marque ce calcul comme le plus récent
     const coords = geojson.geometry.coordinates;
     const { segments, stats } = analyzeRoute(geojson);
     if (segments.length > 0) { setFilteredGeoJSON(segmentsToGeoJSON(segments)); setFilterStats(stats); }
@@ -173,6 +176,7 @@ function App() {
 
     // Altitude + alertes descente
     fetchElevationProfile(geojson).then(elev => {
+      if (routeGenRef.current !== gen) return;
       setElevationData(elev);
       // Bloc E : alertes descentes fortes (seuil véhicule ou 10% par défaut)
       const threshold = vehicle?.slopes?.alert || 10;
@@ -187,20 +191,21 @@ function App() {
 
     // POI puis enrichissement + scoring (DEC-068 : scoring sans requête Overpass)
     setPoisLoading(true);
-    fetchPOIs(geojson).then(async (r) => { console.log('VintageRoute POI chargés:', r.length); setPois(r);
+    fetchPOIs(geojson).then(async (r) => { if (routeGenRef.current !== gen) return; console.log('VintageRoute POI chargés:', r.length); setPois(r);
       // DEC-060 + DEC-065 : Enrichissement en cascade (SPARQL + Wikidata + Wikipedia + Photon) en arrière-plan
-      enrichPOIs(r, (updated) => setPois(updated), coords)
-        .then((final) => { setPois(final); console.log('VintageRoute enrichissement terminé'); })
+      enrichPOIs(r, (updated) => { if (routeGenRef.current !== gen) return; setPois(updated); }, coords)
+        .then((final) => { if (routeGenRef.current !== gen) return; setPois(final); console.log('VintageRoute enrichissement terminé'); })
         .catch((e) => console.warn('Enrichissement:', e.message));
       // DEC-068 : Scoring utilise le nombre de POI déjà chargés (plus de 2e requête Overpass → plus de 429)
       setScoring(calculateScenicScore(geojson, r.length));
     }).catch((e) => console.error('POI:', e.message)).finally(() => {
+      if (routeGenRef.current !== gen) return;
       setPoisLoading(false);
       setPoisDoneAt(Date.now());
     });
-    fetchSP98Stations(geojson).then((r) => { console.log('VintageRoute SP98:', r.length, 'stations'); setSp98Stations(r); })
+    fetchSP98Stations(geojson).then((r) => { if (routeGenRef.current !== gen) return; console.log('VintageRoute SP98:', r.length, 'stations'); setSp98Stations(r); })
       .catch((e) => console.error('SP98:', e.message));
-    fetchRouteWeather(geojson).then(setWeather).catch((e) => console.warn('Météo:', e.message));
+    fetchRouteWeather(geojson).then((w) => { if (routeGenRef.current !== gen) return; setWeather(w); }).catch((e) => console.warn('Météo:', e.message));
   }, [vehicle]);
 
   // DEC-067 — Sauvegarde automatique pour hors-ligne quand l'itinéraire est complet
@@ -435,11 +440,12 @@ function App() {
 
   const handleSelectBis = useCallback(() => {
     if (!bisRouteGeoJSON || !bisRouteInfo) return;
+    const gen = ++routeGenRef.current;
     setRouteGeoJSON(bisRouteGeoJSON); setRouteInfo(bisRouteInfo);
     setBisRouteGeoJSON(null); setBisRouteInfo(null);
     const { segments, stats } = analyzeRoute(bisRouteGeoJSON);
     if (segments.length > 0) { setFilteredGeoJSON(segmentsToGeoJSON(segments)); setFilterStats(stats); }
-    fetchElevationProfile(bisRouteGeoJSON).then(setElevationData).catch(() => {});
+    fetchElevationProfile(bisRouteGeoJSON).then(elev => { if (routeGenRef.current !== gen) return; setElevationData(elev); }).catch(() => {});
   }, [bisRouteGeoJSON, bisRouteInfo]);
 
   const handleCancelBis = useCallback(() => { setBisRouteGeoJSON(null); setBisRouteInfo(null); setBisAlternatives(null); }, []);

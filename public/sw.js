@@ -69,6 +69,14 @@ self.addEventListener('fetch', (event) => {
   // Ignorer chrome-extension, etc.
   if (!url.protocol.startsWith('http')) return;
 
+  // Routing : geré par son propre timeout adaptatif (DEC-071). Ne PAS intercepter,
+  // sinon le timeout API 10s du SW coupe BRouter avant la fin sur les longs trajets
+  // -> fallback IGN qui repasse par l'autoroute (le bug que F3 corrige).
+  if (url.hostname.includes('brouter.de') || url.pathname.includes('/navigation/itineraire')) return;
+
+  // Version : toujours lire la prod réelle, jamais le cache.
+  if (url.pathname === '/version.json') return;
+
   // ── Tuiles carte (CacheFirst) ──
   if (isTileRequest(url)) {
     event.respondWith(cacheFirst(event.request, CACHE_TILES, MAX_TILES));

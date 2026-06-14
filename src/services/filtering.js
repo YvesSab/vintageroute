@@ -5,18 +5,17 @@
  * https://github.com/YvesSab/vintagroute
  */
 
-import bdtopoCreuse from '../data/bdtopo-creuse.json';
 
 /**
  * Départements disponibles pour le chargement dynamique (DEC-026).
- * La Creuse (23) est embarquée dans le bundle, les autres sont chargés à la demande
+ * Tous les départements (Creuse incluse) sont chargés à la demande
  * depuis public/bdtopo/dept-XX.json.
  * 96 départements métropolitains couverts.
  */
 const AVAILABLE_DEPTS = new Set([
   '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
   '11', '12', '13', '14', '15', '16', '17', '18', '19',
-  '21', '22', '24', '25', '26', '27', '28', '29', '2A', '2B',
+  '21', '22', '23', '24', '25', '26', '27', '28', '29', '2A', '2B',
   '30', '31', '32', '33', '34', '35', '36', '37', '38', '39',
   '40', '41', '42', '43', '44', '45', '46', '47', '48', '49',
   '50', '51', '52', '53', '54', '55', '56', '57', '58', '59',
@@ -187,16 +186,6 @@ function findDepartments(routeCoords) {
 async function loadDepartment(dept) {
   if (loadedDepts.has(dept)) return;
 
-  if (dept === '23') {
-    // Creuse déjà embarquée dans le bundle
-    const features = bdtopoCreuse.features || [];
-    allFeatures = allFeatures.concat(features);
-    loadedDepts.add('23');
-    indexDirty = true;
-    console.log(`VintageRoute BD TOPO: dept 23 (Creuse) — ${features.length} tronçons (embarqué)`);
-    return;
-  }
-
   if (!AVAILABLE_DEPTS.has(dept)) {
     console.warn(`VintageRoute BD TOPO: dept ${dept} non disponible`);
     return;
@@ -252,12 +241,8 @@ async function ensureLoaded(routeCoords) {
     await Promise.all(toLoad.map(loadDepartment));
   }
 
-  // Premier chargement ou nouveaux départements ajoutés
-  if (indexDirty || Object.keys(gridIndex).length === 0) {
-    // S'assurer que la Creuse est toujours chargée
-    if (!loadedDepts.has('23')) {
-      await loadDepartment('23');
-    }
+  // Reconstruire l'index si de nouveaux tronçons ont été ajoutés
+  if (indexDirty) {
     rebuildIndex();
   }
 }

@@ -1,66 +1,68 @@
-<!DOCTYPE html>
+<!doctype html>
+<!--
+  VintageRoute — Navigation GPS pour voitures anciennes
+  © 2026 Yves — Tous droits réservés
+  Licence : CC BY-NC-SA 4.0
+-->
 <html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#5b6b2d" />
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#5b6b2d" />
 
-  <!-- SEO Meta -->
-  <meta name="description" content="VintageRoute — Application gratuite de navigation GPS pour voitures anciennes. Itinéraires sans autoroute, sans chemin de terre, adaptés à votre véhicule de collection. Routes paysagères, stations SP98, export GPX.">
-  <meta name="keywords" content="navigation GPS voiture ancienne, itinéraire voiture collection, route paysagère France, GPS vintage car, balade voiture ancienne, rallye touristique FFVE, route départementale, stations SP98, Creuse, voiture de collection">
-  <meta name="author" content="Yves — VintageRoute">
+    <meta name="description" content="VintageRoute — Application gratuite de navigation GPS pour voitures anciennes. Itinéraires sans autoroute, sans chemin de terre, adaptés à votre véhicule de collection. Routes paysagères, stations SP98, export GPX." />
+    <meta name="keywords" content="navigation GPS voiture ancienne, itinéraire voiture collection, route paysagère France, GPS vintage car, balade voiture ancienne, rallye touristique FFVE, route départementale, stations SP98, Creuse, voiture de collection" />
+    <meta name="author" content="Yves — VintageRoute" />
 
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="VintageRoute — Navigation GPS pour voitures anciennes">
-  <meta property="og:description" content="Calculez des itinéraires adaptés à votre voiture ancienne : pas d'autoroute, pas de chemin de terre, pentes adaptées, routes paysagères et stations SP98.">
-  <meta property="og:url" content="https://vintageroute.netlify.app/">
-  <meta property="og:image" content="https://vintageroute.netlify.app/logo-vintagroute.png">
-  <meta property="og:locale" content="fr_FR">
-  <meta property="og:site_name" content="VintageRoute">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="VintageRoute — Navigation GPS pour voitures anciennes" />
+    <meta property="og:description" content="Calculez des itinéraires adaptés à votre voiture ancienne : pas d'autoroute, pas de chemin de terre, pentes adaptées, routes paysagères et stations SP98." />
+    <meta property="og:url" content="https://vintageroute.netlify.app/" />
+    <meta property="og:image" content="https://vintageroute.netlify.app/logo-vintagroute.png" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="VintageRoute" />
 
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="VintageRoute — GPS pour voitures anciennes">
-  <meta name="twitter:description" content="Itinéraires adaptés aux voitures de collection : routes paysagères, pas d'autoroute, stations SP98.">
-  <meta name="twitter:image" content="https://vintageroute.netlify.app/logo-vintagroute.png">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="VintageRoute — GPS pour voitures anciennes" />
+    <meta name="twitter:description" content="Itinéraires adaptés aux voitures de collection : routes paysagères, pas d'autoroute, stations SP98." />
+    <meta name="twitter:image" content="https://vintageroute.netlify.app/logo-vintagroute.png" />
 
-  <!-- Canonical -->
-  <link rel="canonical" href="https://vintageroute.netlify.app/">
+    <link rel="canonical" href="https://vintageroute.netlify.app/" />
 
-  <!-- Schema.org JSON-LD -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "VintageRoute",
-    "applicationCategory": "TravelApplication",
-    "operatingSystem": "Web",
-    "description": "Application gratuite de navigation GPS pour voitures anciennes. Itinéraires sans autoroute, routes paysagères, profils véhicule, stations SP98.",
-    "url": "https://vintageroute.netlify.app/",
-    "image": "https://vintageroute.netlify.app/logo-vintagroute.png",
-    "author": { "@type": "Person", "name": "Yves" },
-    "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
-    "featureList": [
-      "Itinéraires sans autoroute",
-      "Filtrage surface routes (BD TOPO IGN)",
-      "51 profils véhicule avec calcul de pente",
-      "Stations SP98 sans éthanol",
-      "Mode boucle avec circuits circulaires",
-      "Scoring paysager et sinuosité",
-      "Export GPX et PDF",
-      "GPS temps réel"
-    ],
-    "inLanguage": "fr"
-  }
-  </script>
+    <!-- Icônes / installation -->
+    <link rel="icon" href="%PUBLIC_URL%/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VintageRoute" />
+    <meta name="mobile-web-app-capable" content="yes" />
 
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-  <title>VintageRoute — Navigation GPS pour voitures anciennes</title>
-</head>
-<body>
-  <noscript>Vous devez activer JavaScript pour utiliser VintageRoute.</noscript>
-  <div id="root"></div>
-</body>
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Données structurées (valide schema.org/WebApplication) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "VintageRoute",
+      "url": "https://vintageroute.netlify.app/",
+      "description": "Application gratuite de navigation GPS pour voitures anciennes : itinéraires sans autoroute, routes paysagères, profils véhicule, stations SP98.",
+      "applicationCategory": "TravelApplication",
+      "operatingSystem": "Web, Android, iOS",
+      "browserRequirements": "Requires JavaScript",
+      "inLanguage": "fr-FR",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "author": { "@type": "Person", "name": "Yves" }
+    }
+    </script>
+
+    <title>VintageRoute — Navigation GPS pour voitures anciennes</title>
+  </head>
+  <body>
+    <noscript>Vous devez activer JavaScript pour utiliser VintageRoute.</noscript>
+    <div id="root"></div>
+  </body>
 </html>

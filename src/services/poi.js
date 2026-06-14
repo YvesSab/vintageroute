@@ -47,7 +47,14 @@ async function fetchOverpassWithServers(query, servers, timeout = TIMEOUT_OVERPA
       const data = await response.json();
       console.log('VintageRoute Overpass: succès via', shortName);
       return data;
-    } catch (err) { lastError = err; console.warn('VintageRoute Overpass:', err.message, '→ fallback'); continue; }
+    } catch (err) {
+      // F4 — annulation volontaire (nouveau calcul) : sortir immédiatement,
+      // ne pas logguer un fallback trompeur ni essayer le serveur suivant.
+      if (err.name === 'AbortError' || poiAbortController?.signal.aborted) {
+        throw new Error('POI fetch annulé (nouveau calcul en cours)');
+      }
+      lastError = err; console.warn('VintageRoute Overpass:', err.message, '→ fallback'); continue;
+    }
   }
   throw lastError || new Error('Tous les serveurs Overpass sont indisponibles');
 }

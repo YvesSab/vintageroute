@@ -138,7 +138,7 @@ export async function exportPDF(mapContainer, mapInstance, params) {
   pdf.text('(c) 2026 VintageRoute - vintagroute.netlify.app', W / 2, H - 3, { align: 'center' });
 
   // ══════════ PAGE 2 : DÉTAILS ══════════
-  const hasElev = params.elevationData?.profile?.length > 0;
+  const hasElev = params.elevationData?.points?.length > 0;
   const hasPois = params.pois?.length > 0;
 
   if (hasElev || hasPois) {
@@ -155,7 +155,7 @@ export async function exportPDF(mapContainer, mapInstance, params) {
       pdf.setTextColor(30, 45, 58);
       pdf.text('Profil altimetrique', m, y); y += 3;
 
-      const prof = params.elevationData.profile;
+      const prof = params.elevationData.points;
       const cW = W - m * 2, cHt = 35, cY = y;
 
       pdf.setFillColor(245, 243, 235);
